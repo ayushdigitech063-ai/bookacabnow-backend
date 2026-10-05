@@ -1,23 +1,28 @@
-const {createApiError} =   require("../utils/apiError")
+const { createApiError } = require("../utils/apiError");
 
-const errorHandler = (err,req,res, next) => {
-    let customError = err; 
-    if(!error.statusCode) {
-        const statusCode = 500;
-        const message = error.message || "Internal Server Error";
-        error = createApiError(status , message ,customError.errors || []);
-    }
+const errorHandler = (err, req, res, _next) => {
+  let customError = err;
+  console.error("DEBUG ERROR:", err);
 
-    const response = {
-        success :false,
-        message : customError.message,
-        error : customError.errors || [],
-        ...(process.env.NODE_ENV === "development" && { stack: customError.stack })
-    };
+  // Agar custom API error structure nahi hai (jaise unhandled exceptions)
+  if (!customError.statusCode) {
+    console.log(req.originalUrl);
+    // console.log(customError)
+    const statusCode = 500; 
+    const message = customError.message || "Internal Server Error";
+    customError = createApiError(statusCode, message, customError.errors || []);
+  }
 
-    return res.status(customError.statusCode).json(response); 
+  const response = {
+    success: false,
+    message: customError.message,
+    errors: customError.errors || [],
+    ...(process.env.NODE_ENV === "development" && { stack: customError.stack })
+  };
+
+  return res.status(customError.statusCode || 500).json(response);
 };
-        
+
 module.exports = {
-    errorHandler
-}
+  errorHandler
+};

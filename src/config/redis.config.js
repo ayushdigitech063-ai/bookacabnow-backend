@@ -17,7 +17,7 @@ const createRedisClient = () => {
     }
   });
 
-  redis.on("connect", () => {
+  redis.on("ready", () => {
     console.log("[Redis] Connected successfully for Live GPS Telemetry & Caching");
   });
 

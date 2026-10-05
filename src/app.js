@@ -4,6 +4,9 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const { errorHandler } = require("./middlewares/error.middleware");
 const { sendApiResponse } = require("./utils/apiResponse");
+const authRoutes = require("./routes/auth.routes");
+const fleetRoutes = require("./routes/fleet.routes");
+const vehicleRoutes = require("./routes/vehicle.routes");
 
 const app = express();
 
@@ -18,6 +21,10 @@ app.use(morgan("dev"));
 app.get("/health", (req, res) => {
   return sendApiResponse(res, 200, { uptime: process.uptime() }, "Server is up and healthy");
 });
+
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/fleet", fleetRoutes);
+app.use("/api/v1/vehicles", vehicleRoutes);
 
 
 app.use(errorHandler);
