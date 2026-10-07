@@ -138,8 +138,39 @@ const updateDriverShiftSchema = Joi.object({
   isAvailable: Joi.boolean().default(false)
 });
 
+const updateVehicleDocumentsSchema = Joi.object({
+  insuranceExpiry: Joi.date().iso().greater("now").optional().messages({
+    "date.greater": "Insurance expiry date must be in the future",
+    "date.format": "Insurance expiry must be a valid ISO date"
+  }),
+  fitnessExpiry: Joi.date().iso().greater("now").optional().messages({
+    "date.greater": "Fitness expiry date must be in the future",
+    "date.format": "Fitness expiry must be a valid ISO date"
+  })
+});
+
+const verifyVehicleDocumentsSchema = Joi.object({
+  status: Joi.string()
+    .valid("APPROVED", "REJECTED")
+    .required()
+    .messages({
+      "any.only": "Status must be either APPROVED or REJECTED",
+      "any.required": "Verification status is required"
+    }),
+  rejectionReason: Joi.when("status", {
+    is: "REJECTED",
+    then: Joi.string().trim().min(5).required().messages({
+      "any.required": "Rejection reason is required when status is REJECTED",
+      "string.min": "Rejection reason must be at least 5 characters long"
+    }),
+    otherwise: Joi.string().optional().allow(null, "")
+  })
+});
+
 module.exports = {
   createVehicleSchema,
   assignDriverSchema,
-  updateDriverShiftSchema
+  updateDriverShiftSchema,
+  updateVehicleDocumentsSchema,
+  verifyVehicleDocumentsSchema
 };

@@ -6,7 +6,7 @@ const {
   login,
   verifyEmail,
   getMe,
-  updateDriverShift
+  // updateDriverShift
 } = require("../controllers/auth.controller");
 
 const { validate } = require("../middlewares/validate.middleware");
@@ -26,12 +26,12 @@ router.get("/verify-email", verifyEmail);
 router.get("/me", verifyToken, getMe);
 
 // 3. Driver Shift Route (Protected: Only INDIVIDUAL_DRIVER or FLEET_DRIVER)
-router.patch(
-  "/shift",
-  verifyToken,
-  authorizeRoles("INDIVIDUAL_DRIVER", "FLEET_DRIVER"),
-  validate(updateDriverShiftSchema),
-  updateDriverShift
-);
+// router.patch(
+//   "/shift",
+//   verifyToken,
+//   authorizeRoles("INDIVIDUAL_DRIVER", "FLEET_DRIVER"),
+//   validate(updateDriverShiftSchema),
+//   updateDriverShift
+// );
 
 module.exports = router;

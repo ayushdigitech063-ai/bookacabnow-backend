@@ -11,16 +11,16 @@ const vehicleSchema = new mongoose.Schema(
     ownerModel: {
       type: String,
       enum: ["User", "FleetCompany"],
-      required: true // Tells Mongoose whether to look in "User" or "FleetCompany"
+      required: true
     },
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
-      refPath: "ownerModel", // Dynamically resolves to User or FleetCompany model
+      refPath: "ownerModel", 
       required: true
     },
     ownerContact: {
-      fullName: { type: String, required: true, trim: true }, // From form: Owner Full Name
-      phone: { type: String, required: true, trim: true }      // From form: Contact Phone Number
+      fullName: { type: String, required: true, trim: true },
+      phone: { type: String, required: true, trim: true }  
     },
 
     // --- 2. Fleet Shift Roster & Driver Lock ---
@@ -42,37 +42,42 @@ const vehicleSchema = new mongoose.Schema(
     },
     model: {
       type: String,
-      required: [true, "Car model name is required"], // e.g., Swift Dzire, Innova Crysta
+      required: [true, "Car model name is required"],
       trim: true
     },
     category: {
       type: String,
-      enum: ["HATCHBACK", "SEDAN", "SUV", "INNOVA", "LUXURY", "BUS"], // Matches UI Category tabs[cite: 1]
+      enum: ["HATCHBACK", "SEDAN", "SUV", "INNOVA", "LUXURY", "BUS"],
       required: true
     },
     baseCity: {
       type: String,
-      required: [true, "Base operating city is required"], // e.g., Jaipur, Delhi
+      required: [true, "Base operating city is required"], 
       trim: true,
       index: true
     },
     seatingCapacity: {
       type: Number,
-      required: [true, "Seating capacity is required"] // e.g., 4, 6, 7
+      required: [true, "Seating capacity is required"] 
     },
     fuelType: {
       type: String,
-      enum: ["PETROL", "DIESEL", "CNG", "PETROL_CNG", "EV"], // Handles hybrid Petrol/CNG option
+      enum: ["PETROL", "DIESEL", "CNG", "PETROL_CNG", "EV"],
       required: true
     },
 
-    // --- 4. Commercial Registration & Legal Compliance ---
+  
     commercialRcNumber: {
       type: String,
-      required: [true, "Commercial RC Number is required"], // e.g., RJ-14-TA-1234
+      required: [true, "Commercial RC Number is required"], 
       unique: true,
       uppercase: true,
       trim: true
+    },
+    status: {
+      type: String,
+      enum: ["ACTIVE", "INACTIVE", "BLOCKED"],
+      default: "INACTIVE"
     },
     complianceDocuments: {
       rcUrl: { type: String, default: null },
@@ -81,8 +86,21 @@ const vehicleSchema = new mongoose.Schema(
       fitnessExpiry: { type: Date, default: null },
       documentStatus: {
         type: String,
-        enum: ["PENDING", "APPROVED", "REJECTED"],
+        enum: ["PENDING", "SUBMITTED","APPROVED", "REJECTED"],
         default: "PENDING"
+      },
+      rejectionReason: { 
+    type: String, 
+    default: null 
+  },
+  verifiedAt: { 
+    type: Date, 
+    default: null 
+  },
+  verifiedBy: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: "User", 
+        default: null 
       }
     },
 

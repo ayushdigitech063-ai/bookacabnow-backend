@@ -134,6 +134,7 @@ const bookingSchema = new mongoose.Schema(
       perKmRate: { type: Number, required: true },
       estimatedDistanceKm: { type: Number, default: 0 },
       distanceCharge: { type: Number, default: 0 },
+      previousDues: { type: Number, default: 0 }, // <--- Add this field
       totalDriverAllowance: { type: Number, default: 0 }, // totalDays * driverAllowancePerDay[cite: 1]
       nightStayAllowance: { type: Number, default: 0 },
       tollAndTaxes: { type: Number, default: 0 },
@@ -144,7 +145,7 @@ const bookingSchema = new mongoose.Schema(
     // --- Trip Security OTPs ---
     startOtp: {
       type: String,
-      required: true,
+default: () => Math.floor(1000 + Math.random() * 9000).toString(),
       select: false
     },
     endOtp: {

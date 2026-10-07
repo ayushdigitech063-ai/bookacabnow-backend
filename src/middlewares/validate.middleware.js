@@ -1,25 +1,29 @@
+// src/middlewares/validate.middleware.js
 const { createApiError } = require("../utils/apiError");
 
-const validate = (schema) => (req, res, next) => {
-  // Guard clause: agar schema undefined pass ho gaya toh app crash nahi hoga
+const validate = (schema, source = "body") => (req, res, next) => {
   if (!schema || typeof schema.validate !== "function") {
     return next(
       createApiError(500, "Validation schema is missing or undefined in route definition")
     );
   }
 
-  const { error, value } = schema.validate(req.body, {
+  // Safe fallback: defaults strictly to 'body' if not specified
+  const dataToValidate = req[source] || {};
+
+  const { error, value } = schema.validate(dataToValidate, {
     abortEarly: false,
-    stripUnknown: true
+    stripUnknown: true,
+    convert: true, // Auto-typecasting
   });
 
   if (error) {
     const errorDetails = error.details.map((d) => d.message.replace(/['"]/g, ""));
-    console.log("❌ Joi Validation Failed:", errorDetails);
     return next(createApiError(400, "Validation Error", errorDetails));
   }
 
-  req.body = value;
+  // Sanitized data wapas usi source par assign ho jayega (req.body ya req.params)
+  req[source] = value;
   return next();
 };
 

@@ -243,76 +243,122 @@ const getMe = asyncHandler(async (req, res) => {
 // ==========================================
 // 5. DRIVER SHIFT TOGGLE (PATCH /api/v1/auth/shift)
 // ==========================================
-const updateDriverShift = asyncHandler(async (req, res) => {
-  const { isShiftActive } = req.body;
-  const user = req.user;
+// const updateDriverShift = asyncHandler(async (req, res) => {
+//   const { isShiftActive } = req.body;
+//   const user = req.user;
 
-  if (user.role !== "INDIVIDUAL_DRIVER" && user.role !== "FLEET_DRIVER") {
-    throw createApiError(
-      403,
-      "Only registered drivers can update shift status",
-    );
-  }
+//   // Role validation
+//   if (user.role !== "INDIVIDUAL_DRIVER" && user.role !== "FLEET_DRIVER") {
+//     throw createApiError(
+//       403,
+//       "Only registered drivers can update shift status"
+//     );
+//   }
 
-  // 1. Shift ON validations
-  if (isShiftActive) {
-    if (user.driverDetails?.kycStatus !== "APPROVED") {
-      throw createApiError(
-        403,
-        "Cannot start shift until your KYC status is APPROVED",
-      );
-    }
+//   // ==========================================
+//   // 1. SHIFT ON (GO ONLINE) VALIDATIONS
+//   // ==========================================
+//   if (isShiftActive) {
+//     // Check 1: Driver KYC Approval
+//     if (user.driverDetails?.kycStatus !== "APPROVED") {
+//       throw createApiError(
+//         403,
+//         "Cannot start shift until your personal KYC status is APPROVED"
+//       );
+//     }
 
-    if (!user.driverDetails?.activeVehicleId) {
-      throw createApiError(
-        400,
-        "Cannot start shift without an active assigned vehicle",
-      );
-    }
+//     // Check 2: Active Vehicle Linked
+//     if (!user.driverDetails?.activeVehicleId) {
+//       throw createApiError(
+//         400,
+//         "Cannot start shift without an active assigned vehicle"
+//       );
+//     }
 
-    const vehicle = await Vehicle.findById(user.driverDetails.activeVehicleId);
-    if (!vehicle) {
-      throw createApiError(404, "Assigned vehicle record not found");
-    }
+//     // Fetch assigned vehicle
+//     const vehicle = await Vehicle.findById(user.driverDetails.activeVehicleId);
+//     if (!vehicle) {
+//       throw createApiError(404, "Assigned vehicle record not found");
+//     }
 
-    // Car online switch
-    vehicle.isOnline = true;
-    vehicle.isAvailable = true;
-    await vehicle.save();
+//     // Check 3: Vehicle Overall Status (ACTIVE honi chahiye, BLOCKED ya INACTIVE nahi)
+//     if (vehicle.status !== "ACTIVE") {
+//       throw createApiError(
+//         403,
+//         `Cannot start shift. Vehicle status is currently ${vehicle.status || "INACTIVE"}. Contact admin.`
+//       );
+//     }
 
-    user.driverDetails.isShiftActive = true;
-    user.driverDetails.isAvailable = true;
-  } else {
-    // 2. Shift OFF / Duty Stop
-    if (user.driverDetails?.activeVehicleId) {
-      await Vehicle.findByIdAndUpdate(user.driverDetails.activeVehicleId, {
-        isOnline: false,
-        isAvailable: false,
-      });
-    }
+//     // Check 4: Compliance Documents Approval Status
+//     if (vehicle.complianceDocuments?.documentStatus !== "APPROVED") {
+//       throw createApiError(
+//         403,
+//         `Cannot start shift. Vehicle compliance documents are ${vehicle.complianceDocuments?.documentStatus || "PENDING"}. Approval required.`
+//       );
+//     }
 
-    user.driverDetails.isShiftActive = false;
-    user.driverDetails.isAvailable = false;
-  }
+//     // Check 5: Legal Expiry Dates (Insurance & Fitness must be in the future)
+//     const now = new Date();
 
-  await user.save();
+//     if (
+//       vehicle.complianceDocuments?.insuranceExpiry &&
+//       new Date(vehicle.complianceDocuments.insuranceExpiry) <= now
+//     ) {
+//       throw createApiError(
+//         403,
+//         "Cannot start shift. Vehicle insurance has expired. Please renew and re-upload documents."
+//       );
+//     }
 
-  return sendApiResponse(
-    res,
-    200,
-    {
-      isShiftActive: user.driverDetails.isShiftActive,
-      isAvailable: user.driverDetails.isAvailable,
-      activeVehicleId: user.driverDetails.activeVehicleId,
-    },
-    `Shift ${isShiftActive ? "started (ONLINE)" : "ended (OFFLINE)"} successfully`,
-  );
-});
+//     if (
+//       vehicle.complianceDocuments?.fitnessExpiry &&
+//       new Date(vehicle.complianceDocuments.fitnessExpiry) <= now
+//     ) {
+//       throw createApiError(
+//         403,
+//         "Cannot start shift. Vehicle fitness certificate has expired. Please update compliance."
+//       );
+//     }
+
+//     // --- All Compliance Passed: Set Vehicle & Driver ONLINE ---
+//     vehicle.isOnline = true;
+//     vehicle.isAvailable = true;
+//     await vehicle.save();
+
+//     user.driverDetails.isShiftActive = true;
+//     user.driverDetails.isAvailable = true;
+//   } else {
+//     // ==========================================
+//     // 2. SHIFT OFF / DUTY STOP (GO OFFLINE)
+//     // ==========================================
+//     if (user.driverDetails?.activeVehicleId) {
+//       await Vehicle.findByIdAndUpdate(user.driverDetails.activeVehicleId, {
+//         isOnline: false,
+//         isAvailable: false,
+//       });
+//     }
+
+//     user.driverDetails.isShiftActive = false;
+//     user.driverDetails.isAvailable = false;
+//   }
+
+//   await user.save();
+
+//   return sendApiResponse(
+//     res,
+//     200,
+//     {
+//       isShiftActive: user.driverDetails.isShiftActive,
+//       isAvailable: user.driverDetails.isAvailable,
+//       activeVehicleId: user.driverDetails.activeVehicleId,
+//     },
+//     `Shift ${isShiftActive ? "started (ONLINE)" : "ended (OFFLINE)"} successfully`
+//   );
+// });
 
 module.exports = {
   register,
   login,
   verifyEmail,
   getMe,
-  updateDriverShift,
 };

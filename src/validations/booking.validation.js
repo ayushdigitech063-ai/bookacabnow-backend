@@ -1,80 +1,131 @@
+// src/validations/booking.validation.js
 const Joi = require("joi");
 
-const coordinateSchema = Joi.array()
-  .items(
-    Joi.number().min(-180).max(180).required(), // Longitude
-    Joi.number().min(-90).max(90).required()     // Latitude
-  )
-  .length(2)
-  .required();
+const searchNearbyCabsSchema = Joi.object({
+  pickupCoordinates: Joi.array()
+    .items(
+      Joi.number().min(-180).max(180).required(), // Longitude
+      Joi.number().min(-90).max(90).required()    // Latitude
+    )
+    .length(2)
+    .required()
+    .messages({
+      "array.base": "pickupCoordinates must be an array of [longitude, latitude]",
+      "array.length": "pickupCoordinates must contain exactly [longitude, latitude]",
+      "any.required": "pickupCoordinates are required",
+    }),
+    dropCoordinates: Joi.array()
+    .ordered(
+      Joi.number().min(-180).max(180).required(), // Longitude
+      Joi.number().min(-90).max(90).required()    // Latitude
+    )
+    .length(2)
+    .required()
+    .messages({
+      "any.required": "Drop coordinates are required to calculate fare",
+    }),
 
-const locationPointSchema = Joi.object({
-  address: Joi.string().trim().min(3).max(250).required(),
-  coordinates: coordinateSchema
+  serviceCategory: Joi.string()
+    .valid(
+      "LOCAL_RIDE",
+      "OUTSTATION",
+      "AIRPORT_TRANSFER",
+      "HOURLY_RENTAL",
+      "WEDDING",
+      "CORPORATE"
+    )
+    .default("LOCAL_RIDE")
+    .messages({
+      "any.only": "Invalid serviceCategory specified",
+    }),
+
+  category: Joi.string()
+    .valid("HATCHBACK", "SEDAN", "SUV", "AUTO", "BIKE")
+    .optional()
+    .messages({
+      "any.only": "Invalid vehicle category specified",
+    }),
+
+  radiusInKm: Joi.number().min(1).max(25).default(5).messages({
+    "number.min": "Search radius must be at least 1 KM",
+    "number.max": "Search radius cannot exceed 25 KM",
+  }),
 });
-
 const createBookingSchema = Joi.object({
   serviceCategory: Joi.string()
-    .valid("LOCAL_RIDE", "OUTSTATION", "AIRPORT_TRANSFER", "HOURLY_RENTAL", "WEDDING", "CORPORATE")
-    .required(),
+    .valid(
+      "LOCAL_RIDE",
+      "OUTSTATION",
+      "AIRPORT_TRANSFER",
+      "HOURLY_RENTAL",
+      "WEDDING",
+      "CORPORATE"
+    )
+    .required()
+    .messages({
+      "any.required": "serviceCategory is required",
+      "any.only": "Invalid serviceCategory specified",
+    }),
+
   tripType: Joi.string()
     .valid("ONE_WAY", "ROUND_TRIP", "AIRPORT_TRANSFER", "HOURLY_RENTAL", "MULTI_DAY")
-    .required(),
+    .required()
+    .messages({
+      "any.required": "tripType is required",
+      "any.only": "Invalid tripType specified",
+    }),
 
-  pickup: locationPointSchema.required(),
+  pickup: Joi.object({
+    address: Joi.string().trim().required().messages({
+      "any.required": "Pickup address text is required",
+    }),
+    coordinates: Joi.array()
+      .items(
+        Joi.number().min(-180).max(180).required(), // Longitude
+        Joi.number().min(-90).max(90).required()    // Latitude
+      )
+      .length(2)
+      .required()
+      .messages({
+        "array.length": "Pickup coordinates must be [longitude, latitude]",
+      }),
+  }).required(),
 
-  dropoff: locationPointSchema.when("serviceCategory", {
-    is: "HOURLY_RENTAL",
-    then: Joi.optional().allow(null),
-    otherwise: Joi.required()
+  dropoff: Joi.object({
+    address: Joi.string().trim().required().messages({
+      "any.required": "Dropoff address text is required",
+    }),
+    coordinates: Joi.array()
+      .items(
+        Joi.number().min(-180).max(180).required(), // Longitude
+        Joi.number().min(-90).max(90).required()    // Latitude
+      )
+      .length(2)
+      .required()
+      .messages({
+        "array.length": "Dropoff coordinates must be [longitude, latitude]",
+      }),
+  }).required(),
+
+  pickupDateTime: Joi.date().iso().required().messages({
+    "date.base": "pickupDateTime must be a valid ISO Date",
+    "any.required": "pickupDateTime is required",
   }),
 
-  pickupDateTime: Joi.date().min("now").required(),
-  returnDateTime: Joi.date().greater(Joi.ref("pickupDateTime")).when("tripType", {
-    is: Joi.valid("ROUND_TRIP", "MULTI_DAY"),
-    then: Joi.required(),
-    otherwise: Joi.optional().allow(null)
-  }),
+  category: Joi.string()
+    .valid("HATCHBACK", "SEDAN", "SUV", "AUTO", "BIKE")
+    .required()
+    .messages({
+      "any.required": "Vehicle category selection is required",
+      "any.only": "Invalid vehicle category",
+    }),
 
-  vehicleId: Joi.string().hex().length(24).optional().allow(null),
-
-  multiDayDetails: Joi.object({
-    totalDays: Joi.number().integer().min(2).max(30).required(),
-    minKmPerDay: Joi.number().min(200).default(250),
-    driverAllowancePerDay: Joi.number().min(200).default(300),
-    nightStayChargePerNight: Joi.number().min(0).default(250)
-  }).when("tripType", {
-    is: "MULTI_DAY",
-    then: Joi.required(),
-    otherwise: Joi.optional()
-  }),
-
-  rentalPackage: Joi.object({
-    packageType: Joi.string().valid("4HR_40KM", "8HR_80KM", "12HR_120KM").required(),
-    extraHourRate: Joi.number().min(0).required(),
-    extraKmRate: Joi.number().min(0).required()
-  }).when("serviceCategory", {
-    is: "HOURLY_RENTAL",
-    then: Joi.required(),
-    otherwise: Joi.optional().allow(null)
-  }),
-
-  airportDetails: Joi.object({
-    flightNumber: Joi.string().trim().uppercase().optional().allow(null, ""),
-    terminal: Joi.string().trim().optional().allow(null, "")
-  }).optional(),
-
-  paymentMethod: Joi.string().valid("CASH", "ONLINE_UPI", "WALLET").default("CASH")
-}).custom((value, helpers) => {
-  // Edge Case: Check pickup and dropoff coordinates are not identical
-  if (value.dropoff && value.pickup) {
-    const [pLng, pLat] = value.pickup.coordinates;
-    const [dLng, dLat] = value.dropoff.coordinates;
-    if (pLng === dLng && pLat === dLat) {
-      return helpers.message({ custom: "Pickup and Dropoff locations cannot be identical" });
-    }
-  }
-  return value;
+  paymentMethod: Joi.string()
+    .valid("CASH", "ONLINE_UPI", "WALLET")
+    .default("CASH"),
 });
 
-module.exports = { createBookingSchema };
+module.exports = {
+  searchNearbyCabsSchema,
+  createBookingSchema,
+};

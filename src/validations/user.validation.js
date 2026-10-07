@@ -63,16 +63,16 @@ const loginUserSchema = Joi.object({
     "object.missing": "Please provide either phone number or email to login"
   });
 
-  const updateDriverShiftSchema = Joi.object({
-  isShiftActive: Joi.boolean().required().messages({
-    "boolean.base": "isShiftActive must be a boolean (true or false)",
-    "any.required": "isShiftActive is required"
-  }),
-  isAvailable: Joi.boolean().default(false)
-});
+//   const updateDriverShiftSchema = Joi.object({
+//   isShiftActive: Joi.boolean().required().messages({
+//     "boolean.base": "isShiftActive must be a boolean (true or false)",
+//     "any.required": "isShiftActive is required"
+//   }),
+//   isAvailable: Joi.boolean().default(false)
+// });
 
 module.exports = {
   registerUserSchema,
   loginUserSchema,
-  updateDriverShiftSchema
+  // updateDriverShiftSchema
 };

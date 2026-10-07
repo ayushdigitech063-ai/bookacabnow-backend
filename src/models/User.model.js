@@ -34,8 +34,8 @@ const userSchema = new mongoose.Schema(
     // --- 2. System Role Management ---
     role: {
       type: String,
-      enum: ["USER", "INDIVIDUAL_DRIVER", "FLEET_DRIVER", "FLEET_OWNER", "ADMIN", "SUPER_ADMIN"],
-      default: "USER"
+      enum: ["RIDER", "INDIVIDUAL_DRIVER", "FLEET_DRIVER", "FLEET_OWNER", "ADMIN", "SUPER_ADMIN"],
+      default: "RIDER"
     },
 
     // --- 3. Driver Profile & Shift Tracking ---
@@ -107,6 +107,17 @@ const userSchema = new mongoose.Schema(
       }
     },
 
+
+    riderDetails: {
+      totalRides: {
+        type: Number,
+        default: 0
+      },
+      outstandingDues: {
+        type: Number,
+        default: 0 // Agar cancellation penalty pending ho toh yahan store hoga
+      }
+    },
     // --- 4. Saved Addresses (For Riders) ---
     savedAddresses: [
       {
