@@ -118,10 +118,7 @@ const getAgencyDrivers = asyncHandler(async (req, res) => {
   );
 });
 
-// ==========================================
-// 4. APPROVE OR REJECT FLEET DRIVER
-// PATCH /api/v1/fleet/drivers/:driverId/approval
-// ==========================================
+
 const updateDriverApproval = asyncHandler(async (req, res) => {
   const { driverId } = req.params;
   const { status } = req.body; // "APPROVED", "REJECTED", "PENDING"

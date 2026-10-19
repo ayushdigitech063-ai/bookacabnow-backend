@@ -21,7 +21,9 @@ const {
   acceptRideRequest,
   markDriverArrived,
   startRide,
-  completeRide
+  completeRide,
+  getNearbyRideRequests,
+  getDriverEarnings
 } = require("../controllers/driver.controller");
 
 
@@ -69,5 +71,7 @@ router.patch(
   validate(completeRideSchema, "body"),
   completeRide
 );
+router.get("/earnings", getDriverEarnings);
+router.get("/rides/nearby", getNearbyRideRequests);
 
 module.exports = router;

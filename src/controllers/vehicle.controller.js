@@ -75,11 +75,8 @@ const addFleetVehicle = asyncHandler(async (req, res) => {
     data: vehicle,
   });
 });
+  
 
-// ==========================================
-// 2. ADD VEHICLE BY INDIVIDUAL DRIVER
-// POST /api/v1/vehicles/individual/add
-// ==========================================
 const addIndividualVehicle = asyncHandler(async (req, res) => {
   const user = req.user;
 
@@ -149,10 +146,7 @@ const addIndividualVehicle = asyncHandler(async (req, res) => {
   });
 });
 
-// ==========================================
-// 3. GET FLEET OWNER'S VEHICLES LIST
-// GET /api/v1/vehicles/fleet/my-vehicles
-// ==========================================
+
 const getMyFleetVehicles = asyncHandler(async (req, res) => {
   const user = req.user;
 

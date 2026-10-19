@@ -9,6 +9,8 @@ const fleetRoutes = require("./routes/fleet.routes");
 const vehicleRoutes = require("./routes/vehicle.routes");
 const driverRouter = require("./routes/driver.routes");
 const bookingRouter = require("./routes/booking.routes");
+const subscriptionPlanRoutes = require("./routes/subscriptionPlan.routes.js");
+const subscriptionOrderRoutes = require("./routes/subscriptionOrder.routes.js");
 
 const app = express();
 
@@ -29,7 +31,8 @@ app.use("/api/v1/fleet", fleetRoutes);
 app.use("/api/v1/vehicles", vehicleRoutes);
 app.use("/api/v1/driver", driverRouter);
 app.use("/api/v1/bookings", bookingRouter);
-
+app.use("/api/v1/subscription-plans", subscriptionPlanRoutes);
+app.use("/api/v1/subscription-orders", subscriptionOrderRoutes);
 
 
 app.use(errorHandler);

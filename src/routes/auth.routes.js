@@ -4,7 +4,7 @@ const router = express.Router();
 const {
   register,
   login,
-  verifyEmail,
+  verifyEmail,  
   getMe,
   // updateDriverShift
 } = require("../controllers/auth.controller");

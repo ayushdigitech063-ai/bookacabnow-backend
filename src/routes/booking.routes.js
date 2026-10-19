@@ -5,7 +5,7 @@ const router = express.Router();
 const { verifyToken } = require("../middlewares/auth.middleware");
 const { validate } = require("../middlewares/validate.middleware");
 const { searchNearbyCabsSchema, createBookingSchema } = require("../validations/booking.validation");
-const { searchNearbyCabs , createBookingRequest, cancelRideByRider} = require("../controllers/booking.controller");
+const { searchNearbyCabs , createBookingRequest, cancelRideByRider, getMyRides,rateTrip, getBookingDetails, getActiveBooking, cancelRideByDriver} = require("../controllers/booking.controller");
 
 // Customer authenticated routes
 router.use(verifyToken);
@@ -24,4 +24,11 @@ router.post(
 
 
 router.post("/:bookingId/cancel", cancelRideByRider);
+
+router.get("/my-rides", getMyRides);
+router.post("/:bookingId/rate", rateTrip);
+// src/routes/booking.routes.js
+router.get("/active", getActiveBooking);
+router.get("/:bookingId", getBookingDetails);
+router.post("/:bookingId/cancel/driver", cancelRideByDriver);
 module.exports = router;

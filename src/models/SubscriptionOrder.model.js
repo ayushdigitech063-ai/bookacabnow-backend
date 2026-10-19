@@ -1,32 +1,32 @@
 const mongoose = require("mongoose");
 
-const subscriptionOrder = new mongoose.Schema(
+const subscriptionOrderSchema = new mongoose.Schema(
   {
     orderId: {
       type: String,
       required: true,
       unique: true,
       uppercase: true,
-      index: true // e.g. "ORD-SUB-1024"
+      index: true, // e.g. "ORD-SUB-1024"
     },
     invoiceNumber: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true, // Null hone par duplicate error nahi aayega
       uppercase: true,
-      index: true // e.g. "INV-SUB-1024"
+      default: null, // Payment SUCCESS hone ke baad generate hoga
     },
 
     fleetCompanyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "FleetCompany",
       required: true,
-      index: true
+      index: true,
     },
     orderedByUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true
+      required: true,
     },
 
     // Freeze details of the fleet owner placing the order
@@ -39,72 +39,81 @@ const subscriptionOrder = new mongoose.Schema(
       billingAddress: {
         city: { type: String, required: true },
         state: { type: String, default: "Rajasthan" },
-        pincode: { type: String, default: "" }
-      }
+        pincode: { type: String, default: "" },
+      },
     },
 
     planId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SubscriptionPlan",
-      required: true
+      required: true,
     },
     planSnapshot: {
       planName: { type: String, required: true },
       maxCarSlots: { type: Number, required: true },
-      durationInDays: { type: Number, required: true }
+      durationInDays: { type: Number, required: true },
+      originalPrice: { type: Number, required: true },
     },
 
     amountPaid: {
       type: Number,
-      required: true
+      required: true,
     },
     gstAmount: {
       type: Number,
-      default: 0
+      default: 0,
     },
 
     startsAt: {
       type: Date,
-      default: Date.now
+      default: null, // Payment success par set hoga
     },
     expiresAt: {
       type: Date,
-      required: true,
-      index: true
+      default: null, // Payment success par calculate hoga
+      index: true,
     },
 
     orderStatus: {
       type: String,
       enum: ["PLACED", "COMPLETED", "FAILED", "CANCELLED"],
-      default: "PLACED"
+      default: "PLACED",
     },
     paymentStatus: {
       type: String,
       enum: ["PENDING", "SUCCESS", "FAILED"],
       default: "PENDING",
-      index: true
+      index: true,
     },
     paymentGateway: {
       type: String,
       enum: ["RAZORPAY", "CASHFREE", "PHONEPE", "MANUAL"],
-      default: "RAZORPAY"
+      default: "RAZORPAY",
     },
     gatewayOrderId: {
       type: String,
-      default: null
+      default: null,
     },
     gatewayPaymentId: {
       type: String,
-      default: null
-    }
+      default: null,
+    },
+    gatewaySignature: {
+      type: String,
+      default: null,
+    },
   },
   {
-    timestamps: true
+    timestamps: true,
   }
 );
 
-planOrderSchema.index({ fleetCompanyId: 1, paymentStatus: 1 });
+// Compound index for fast queries
+subscriptionOrderSchema.index({ fleetCompanyId: 1, paymentStatus: 1 });
 
-const SubscriptionOrder = mongoose.model("PlanOrder", subscriptionOrder);
+const SubscriptionOrder = mongoose.model(
+  "SubscriptionOrder",
+  subscriptionOrderSchema
+);
 
 module.exports = SubscriptionOrder;

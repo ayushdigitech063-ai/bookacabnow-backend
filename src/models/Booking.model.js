@@ -191,7 +191,22 @@ default: () => Math.floor(1000 + Math.random() * 9000).toString(),
       },
       reason: { type: String, default: null },
       cancellationFee: { type: Number, default: 0 }
-    }
+    },
+
+ ratings: {
+  riderFeedback: {
+    score: { type: Number, min: 1, max: 5 },
+    reasonTag: { type: String, default: null }, // Pre-defined tag (e.g. "RASH_DRIVING")
+    customReason: { type: String, default: null }, // Agar "OTHER" choose kiya ho
+    ratedAt: { type: Date, default: null },
+  },
+  driverFeedback: {
+    score: { type: Number, min: 1, max: 5 },
+    reasonTag: { type: String, default: null }, // Pre-defined tag (e.g. "DELAY_AT_PICKUP")
+    customReason: { type: String, default: null },
+    ratedAt: { type: Date, default: null },
+  },
+}
   },
   {
     timestamps: true

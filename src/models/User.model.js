@@ -83,6 +83,18 @@ const userSchema = new mongoose.Schema(
         type: Number,
         default: 0
       },
+      walletBalance: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+
+  // 2. Rider se collect kiya hua cash jo company ko lautana hai (e.g. Previous dues penalty)
+  cashDuesToPlatform: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
 
       // Fleet Company Relationship
       fleetCompanyId: {
@@ -116,7 +128,13 @@ const userSchema = new mongoose.Schema(
       outstandingDues: {
         type: Number,
         default: 0 // Agar cancellation penalty pending ho toh yahan store hoga
-      }
+      },
+      rating: {
+    type: Number,
+    default: 5.0, // <-- BAS YEH LINE ADD KARNI HAI
+    min: 1.0,
+    max: 5.0
+  }
     },
     // --- 4. Saved Addresses (For Riders) ---
     savedAddresses: [
