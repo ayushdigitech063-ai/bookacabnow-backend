@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   createSubscriptionOrder,
   verifySubscriptionPayment,
+  getActiveSubscription,
 } = require("../controllers/subscriptionOrder.controller.js");
 const {
   verifyToken,
@@ -22,6 +23,12 @@ router.post(
   verifyToken,
   authorizeRoles("FLEET_OWNER"),
   verifySubscriptionPayment,
+);
+
+router.get(
+  "/active",
+  authorizeRoles("FLEET_OWNER"),
+  getActiveSubscription
 );
 
 module.exports = router;

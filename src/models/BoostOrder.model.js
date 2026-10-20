@@ -7,27 +7,37 @@ const boostOrderSchema = new mongoose.Schema(
       required: true,
       unique: true,
       uppercase: true,
-      index: true // e.g. "BOOST-9810"
+      index: true, // e.g., "BOOST-9810"
     },
 
+    // Order type tracking (Fleet bulk boost vs Individual driver single boost)
+    orderType: {
+      type: String,
+      enum: ["FLEET", "INDIVIDUAL"],
+      default: "FLEET",
+    },
+
+    // Set to company ID for fleet owners; null for individual drivers
     fleetCompanyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "FleetCompany",
-      required: true,
-      index: true
+      default: null,
+      index: true,
     },
+
     orderedByUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true
+      required: true,
+      index: true,
     },
 
-    // Freeze details of the agency placing the boost order
+    // Freeze details of the agency/driver placing the boost order
     buyerDetails: {
-      companyName: { type: String, required: true },
+      companyName: { type: String, default: "Individual Driver" },
       ownerName: { type: String, required: true },
       phone: { type: String, required: true },
-      email: { type: String, required: true }
+      email: { type: String, required: true },
     },
 
     // Multi-car selection with snapshots for fast frontend rendering
@@ -36,78 +46,81 @@ const boostOrderSchema = new mongoose.Schema(
         vehicleId: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Vehicle",
-          required: true
+          required: true,
         },
         brand: { type: String, required: true },
         model: { type: String, required: true },
         category: {
           type: String,
           enum: ["HATCHBACK", "SEDAN", "SUV", "INNOVA", "LUXURY", "BUS"],
-          required: true
+          required: true,
         },
-        plateNumber: { type: String, required: true },
+        // Updated: Changed from plateNumber to match Vehicle.model.js exactly
+        commercialRcNumber: { type: String, required: true },
         seatingCapacity: { type: Number, required: true },
         fuelType: { type: String, required: true },
         expectedPerKmRate: { type: Number, required: true },
         imageUrl: { type: String, default: null },
-        badgeText: { type: String, default: "TOP TRENDING" }
-      }
+        badgeText: { type: String, default: "TOP TRENDING" },
+      },
     ],
 
     totalCarsCount: {
       type: Number,
-      required: true
+      required: true,
+      min: [1, "At least 1 car must be boosted"],
     },
     ratePerCar: {
       type: Number,
       required: true,
-      default: 299
+      default: 299,
     },
     totalAmountPaid: {
       type: Number,
-      required: true
+      required: true,
     },
     durationDays: {
       type: Number,
-      default: 30
+      default: 30,
     },
 
     startsAt: {
       type: Date,
-      default: Date.now
+      default: Date.now,
     },
     expiresAt: {
       type: Date,
       required: true,
-      index: true
+      index: true,
     },
     isActive: {
       type: Boolean,
-      default: false
+      default: false,
+      index: true,
     },
 
     paymentStatus: {
       type: String,
       enum: ["PENDING", "SUCCESS", "FAILED"],
       default: "PENDING",
-      index: true
+      index: true,
     },
     paymentGateway: {
       type: String,
       enum: ["RAZORPAY", "CASHFREE", "PHONEPE", "MANUAL"],
-      default: "RAZORPAY"
+      default: "RAZORPAY",
     },
     gatewayOrderId: {
       type: String,
-      default: null
+      default: null,
     },
     gatewayPaymentId: {
       type: String,
-      default: null
-    }
+      default: null,
+    },
   },
   {
-    timestamps: true
+    timestamps: true,
   }
 );
 

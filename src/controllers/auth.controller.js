@@ -1,3 +1,4 @@
+// src/controllers/auth.controller.js
 const crypto = require("crypto");
 const User = require("../models/User.model");
 const FleetCompany = require("../models/FleetCompany.model");
@@ -14,26 +15,34 @@ const { sendVerificationEmail } = require("../services/email.services");
 const register = asyncHandler(async (req, res) => {
   const { fullName, phone, email, password, role, driverDetails } = req.body;
 
+  if (!fullName || !phone || !password) {
+    throw createApiError(400, "Full name, phone, and password are required");
+  }
+
   // 1. Duplicate checks
-  const existingPhone = await User.findOne({ phone });
+  const existingPhone = await User.findOne({ phone: phone.trim() });
   if (existingPhone) {
     throw createApiError(409, "User with this mobile number already exists");
   }
 
   if (email) {
-    const existingEmail = await User.findOne({ email });
+    const existingEmail = await User.findOne({ email: email.trim().toLowerCase() });
     if (existingEmail) {
       throw createApiError(409, "User with this email already exists");
     }
   }
 
-  // 2. Fleet Company verification if role is FLEET_DRIVER
-  if (role === "FLEET_DRIVER") {
+  // 2. Target Role (Default: RIDER)
+  const targetRole = role ? role.toUpperCase() : "RIDER";
+  const allowedRoles = ["RIDER", "INDIVIDUAL_DRIVER", "FLEET_DRIVER", "FLEET_OWNER", "ADMIN"];
+  if (!allowedRoles.includes(targetRole)) {
+    throw createApiError(400, `Invalid role '${targetRole}'. Allowed roles: ${allowedRoles.join(", ")}`);
+  }
+
+  // 3. Fleet Driver Validation
+  if (targetRole === "FLEET_DRIVER") {
     if (!driverDetails?.fleetCompanyId) {
-      throw createApiError(
-        400,
-        "Fleet company ID is required for fleet drivers",
-      );
+      throw createApiError(400, "Fleet company ID is required for fleet drivers");
     }
     const company = await FleetCompany.findById(driverDetails.fleetCompanyId);
     if (!company) {
@@ -41,21 +50,20 @@ const register = asyncHandler(async (req, res) => {
     }
   }
 
-  // 3. Build payload aligned with User.model.js
+  // 4. Build payload
   const userPayload = {
-    fullName,
-    phone,
-    password, // Auto-hashed by pre('save') hook
-    role: role || "USER",
+    fullName: fullName.trim(),
+    phone: phone.trim(),
+    password,
+    role: targetRole,
     isPhoneVerified: false,
   };
 
   if (email) {
-    userPayload.email = email;
+    userPayload.email = email.trim().toLowerCase();
   }
 
-  // Drivers profile setup (driverDetails block)
-  if (role === "INDIVIDUAL_DRIVER" || role === "FLEET_DRIVER") {
+  if (targetRole === "INDIVIDUAL_DRIVER" || targetRole === "FLEET_DRIVER") {
     userPayload.driverDetails = {
       licenseNumber: driverDetails?.licenseNumber || null,
       licenseExpiry: driverDetails?.licenseExpiry || null,
@@ -63,18 +71,18 @@ const register = asyncHandler(async (req, res) => {
       kycStatus: "PENDING",
       rating: 5.0,
       totalTripsCompleted: 0,
-      fleetCompanyId:
-        role === "FLEET_DRIVER" ? driverDetails.fleetCompanyId : null,
+      walletBalance: 0,
+      cashDuesToPlatform: 0,
+      fleetCompanyId: targetRole === "FLEET_DRIVER" ? driverDetails.fleetCompanyId : null,
       activeVehicleId: null,
       isShiftActive: false,
       isAvailable: false,
     };
   }
 
-  // 4. Create User
   const newUser = await User.create(userPayload);
 
-  // 5. Verification Email trigger
+  // Email verification trigger (Non-blocking)
   if (email && typeof sendVerificationEmail === "function") {
     const verificationToken = crypto.randomBytes(32).toString("hex");
     sendVerificationEmail(email, verificationToken).catch((err) => {
@@ -82,7 +90,6 @@ const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // 6. Generate JWT Token
   const token = generateToken({
     userId: newUser._id,
     role: newUser.role,
@@ -102,7 +109,7 @@ const register = asyncHandler(async (req, res) => {
       },
       token,
     },
-    "Registration successful.",
+    "Registration successful."
   );
 });
 
@@ -111,7 +118,7 @@ const register = asyncHandler(async (req, res) => {
 // ==========================================
 const login = asyncHandler(async (req, res) => {
   const { identifier, phone, email, password } = req.body;
-  const loginKey = identifier || email || phone;
+  const loginKey = (identifier || email || phone || "").trim();
 
   if (!loginKey || !password) {
     throw createApiError(400, "Please provide phone/email and password");
@@ -131,10 +138,7 @@ const login = asyncHandler(async (req, res) => {
   }
 
   if (user.isSuspended) {
-    throw createApiError(
-      403,
-      "Your account has been deactivated. Please contact support",
-    );
+    throw createApiError(403, "Your account has been deactivated. Please contact support");
   }
 
   const token = generateToken({
@@ -156,13 +160,58 @@ const login = asyncHandler(async (req, res) => {
       },
       token,
     },
-    "Logged in successfully",
+    "Logged in successfully"
   );
 });
 
 // ==========================================
-// 3. EMAIL VERIFICATION
+// 3. GET CURRENT PROFILE
 // ==========================================
+const getMe = asyncHandler(async (req, res) => {
+  const user = req.user;
+
+  let fleetCompany = null;
+  let activeVehicle = null;
+
+  switch (user.role) {
+    case "FLEET_OWNER":
+      fleetCompany = await FleetCompany.findOne({ userId: user._id });
+      break;
+
+    case "FLEET_DRIVER":
+      if (user.driverDetails?.fleetCompanyId) {
+        fleetCompany = await FleetCompany.findById(user.driverDetails.fleetCompanyId).select(
+          "companyName supportPhone businessAddress isApproved"
+        );
+      }
+      if (user.driverDetails?.activeVehicleId) {
+        activeVehicle = await Vehicle.findById(user.driverDetails.activeVehicleId);
+      }
+      break;
+
+    case "INDIVIDUAL_DRIVER":
+      if (user.driverDetails?.activeVehicleId) {
+        activeVehicle = await Vehicle.findById(user.driverDetails.activeVehicleId);
+      }
+      break;
+
+    case "RIDER":
+    case "ADMIN":
+    default:
+      break;
+  }
+
+  return sendApiResponse(
+    res,
+    200,
+    {
+      user,
+      fleetCompany,
+      activeVehicle,
+    },
+    "Profile fetched successfully"
+  );
+});
 const verifyEmail = asyncHandler(async (req, res) => {
   const { token } = req.query;
 
@@ -187,178 +236,9 @@ const verifyEmail = asyncHandler(async (req, res) => {
   return sendApiResponse(res, 200, null, "Email verified successfully!");
 });
 
-// ==========================================
-// 4. GET ME PROFILE
-// ==========================================
-const getMe = asyncHandler(async (req, res) => {
-  const user = req.user;
-
-  let fleetCompany = null;
-  let activeVehicle = null;
-
-  switch (user.role) {
-    case "FLEET_OWNER":
-      fleetCompany = await FleetCompany.findOne({ userId: user._id });
-      break;
-
-    case "FLEET_DRIVER":
-      if (user.driverDetails?.fleetCompanyId) {
-        fleetCompany = await FleetCompany.findById(
-          user.driverDetails.fleetCompanyId,
-        ).select("companyName supportPhone businessAddress isApproved");
-      }
-      if (user.driverDetails?.activeVehicleId) {
-        activeVehicle = await Vehicle.findById(
-          user.driverDetails.activeVehicleId,
-        );
-      }
-      break;
-
-    case "INDIVIDUAL_DRIVER": // 👈 Fixed role name here
-      if (user.driverDetails?.activeVehicleId) {
-        activeVehicle = await Vehicle.findById(
-          user.driverDetails.activeVehicleId,
-        );
-      }
-      break;
-
-    case "USER":
-    case "ADMIN":
-    default:
-      break;
-  }
-
-  return sendApiResponse(
-    res,
-    200,
-    {
-      user,
-      fleetCompany,
-      activeVehicle,
-    },
-    "Profile fetched successfully",
-  );
-});
-
-// ==========================================
-// 5. DRIVER SHIFT TOGGLE (PATCH /api/v1/auth/shift)
-// ==========================================
-// const updateDriverShift = asyncHandler(async (req, res) => {
-//   const { isShiftActive } = req.body;
-//   const user = req.user;
-
-//   // Role validation
-//   if (user.role !== "INDIVIDUAL_DRIVER" && user.role !== "FLEET_DRIVER") {
-//     throw createApiError(
-//       403,
-//       "Only registered drivers can update shift status"
-//     );
-//   }
-
-//   // ==========================================
-//   // 1. SHIFT ON (GO ONLINE) VALIDATIONS
-//   // ==========================================
-//   if (isShiftActive) {
-//     // Check 1: Driver KYC Approval
-//     if (user.driverDetails?.kycStatus !== "APPROVED") {
-//       throw createApiError(
-//         403,
-//         "Cannot start shift until your personal KYC status is APPROVED"
-//       );
-//     }
-
-//     // Check 2: Active Vehicle Linked
-//     if (!user.driverDetails?.activeVehicleId) {
-//       throw createApiError(
-//         400,
-//         "Cannot start shift without an active assigned vehicle"
-//       );
-//     }
-
-//     // Fetch assigned vehicle
-//     const vehicle = await Vehicle.findById(user.driverDetails.activeVehicleId);
-//     if (!vehicle) {
-//       throw createApiError(404, "Assigned vehicle record not found");
-//     }
-
-//     // Check 3: Vehicle Overall Status (ACTIVE honi chahiye, BLOCKED ya INACTIVE nahi)
-//     if (vehicle.status !== "ACTIVE") {
-//       throw createApiError(
-//         403,
-//         `Cannot start shift. Vehicle status is currently ${vehicle.status || "INACTIVE"}. Contact admin.`
-//       );
-//     }
-
-//     // Check 4: Compliance Documents Approval Status
-//     if (vehicle.complianceDocuments?.documentStatus !== "APPROVED") {
-//       throw createApiError(
-//         403,
-//         `Cannot start shift. Vehicle compliance documents are ${vehicle.complianceDocuments?.documentStatus || "PENDING"}. Approval required.`
-//       );
-//     }
-
-//     // Check 5: Legal Expiry Dates (Insurance & Fitness must be in the future)
-//     const now = new Date();
-
-//     if (
-//       vehicle.complianceDocuments?.insuranceExpiry &&
-//       new Date(vehicle.complianceDocuments.insuranceExpiry) <= now
-//     ) {
-//       throw createApiError(
-//         403,
-//         "Cannot start shift. Vehicle insurance has expired. Please renew and re-upload documents."
-//       );
-//     }
-
-//     if (
-//       vehicle.complianceDocuments?.fitnessExpiry &&
-//       new Date(vehicle.complianceDocuments.fitnessExpiry) <= now
-//     ) {
-//       throw createApiError(
-//         403,
-//         "Cannot start shift. Vehicle fitness certificate has expired. Please update compliance."
-//       );
-//     }
-
-//     // --- All Compliance Passed: Set Vehicle & Driver ONLINE ---
-//     vehicle.isOnline = true;
-//     vehicle.isAvailable = true;
-//     await vehicle.save();
-
-//     user.driverDetails.isShiftActive = true;
-//     user.driverDetails.isAvailable = true;
-//   } else {
-//     // ==========================================
-//     // 2. SHIFT OFF / DUTY STOP (GO OFFLINE)
-//     // ==========================================
-//     if (user.driverDetails?.activeVehicleId) {
-//       await Vehicle.findByIdAndUpdate(user.driverDetails.activeVehicleId, {
-//         isOnline: false,
-//         isAvailable: false,
-//       });
-//     }
-
-//     user.driverDetails.isShiftActive = false;
-//     user.driverDetails.isAvailable = false;
-//   }
-
-//   await user.save();
-
-//   return sendApiResponse(
-//     res,
-//     200,
-//     {
-//       isShiftActive: user.driverDetails.isShiftActive,
-//       isAvailable: user.driverDetails.isAvailable,
-//       activeVehicleId: user.driverDetails.activeVehicleId,
-//     },
-//     `Shift ${isShiftActive ? "started (ONLINE)" : "ended (OFFLINE)"} successfully`
-//   );
-// });
-
 module.exports = {
   register,
   login,
-  verifyEmail,
   getMe,
+  verifyEmail
 };

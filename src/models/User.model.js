@@ -1,3 +1,4 @@
+// src/models/User.model.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -7,190 +8,184 @@ const userSchema = new mongoose.Schema(
     fullName: {
       type: String,
       required: [true, "Full name is required"],
-      trim: true
+      trim: true,
     },
     email: {
       type: String,
-      required: [true, "Email address is required"],
       unique: true,
+      sparse: true, // Null hone par duplicate key error nahi dega
       lowercase: true,
       trim: true,
-      index: true
+      index: true,
     },
     phone: {
       type: String,
       required: [true, "Phone number is required"],
       unique: true,
       trim: true,
-      index: true
+      index: true,
     },
     password: {
       type: String,
       required: [true, "Password is required"],
       minlength: [6, "Password must be at least 6 characters long"],
-      select: false // Password queries mein by-default leak nahi hoga
+      select: false,
     },
 
     // --- 2. System Role Management ---
     role: {
       type: String,
       enum: ["RIDER", "INDIVIDUAL_DRIVER", "FLEET_DRIVER", "FLEET_OWNER", "ADMIN", "SUPER_ADMIN"],
-      default: "RIDER"
+      default: "RIDER",
     },
 
     // --- 3. Driver Profile & Shift Tracking ---
-    // (Ye block sirf tab populate/use hoga jab role INDIVIDUAL_DRIVER ya FLEET_DRIVER ho)
     driverDetails: {
       licenseNumber: {
         type: String,
         default: null,
         trim: true,
-        uppercase: true
+        uppercase: true,
       },
       licenseExpiry: {
         type: Date,
-        default: null
+        default: null,
       },
       licenseUrl: {
         type: String,
-        default: null // Cloudinary URL
+        default: null,
       },
       aadharNumber: {
         type: String,
         default: null,
-        trim: true
+        trim: true,
       },
       aadharUrl: {
         type: String,
-        default: null
+        default: null,
       },
       kycStatus: {
         type: String,
         enum: ["NOT_APPLIED", "PENDING", "APPROVED", "REJECTED"],
-        default: "NOT_APPLIED"
+        default: "NOT_APPLIED",
       },
       rejectionReason: {
         type: String,
-        default: null
+        default: null,
       },
       rating: {
         type: Number,
         default: 5.0,
         min: 1.0,
-        max: 5.0
+        max: 5.0,
       },
       totalTripsCompleted: {
         type: Number,
-        default: 0
+        default: 0,
       },
       walletBalance: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
-
-  // 2. Rider se collect kiya hua cash jo company ko lautana hai (e.g. Previous dues penalty)
-  cashDuesToPlatform: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
-
-      // Fleet Company Relationship
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      // Fixed: cashDuesToPlatform is now inside driverDetails
+      cashDuesToPlatform: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
       fleetCompanyId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "FleetCompany",
-        default: null // Kaunsi agency ka driver hai
+        default: null,
       },
-
-      // Active Vehicle & Shift State
       activeVehicleId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Vehicle",
-        default: null // Abhi kaunsi car assign/selected hai
+        default: null,
       },
       isShiftActive: {
         type: Boolean,
-        default: false // Duty Start / Stop toggle
+        default: false,
       },
       isAvailable: {
         type: Boolean,
-        default: false // Live ride receive karne ke liye ready hai ya nahi
-      }
+        default: false,
+      },
     },
-
 
     riderDetails: {
       totalRides: {
         type: Number,
-        default: 0
+        default: 0,
       },
       outstandingDues: {
         type: Number,
-        default: 0 // Agar cancellation penalty pending ho toh yahan store hoga
+        default: 0,
       },
       rating: {
-    type: Number,
-    default: 5.0, // <-- BAS YEH LINE ADD KARNI HAI
-    min: 1.0,
-    max: 5.0
-  }
+        type: Number,
+        default: 5.0,
+        min: 1.0,
+        max: 5.0,
+      },
     },
-    // --- 4. Saved Addresses (For Riders) ---
+
+    // --- 4. Saved Addresses ---
     savedAddresses: [
       {
         label: {
           type: String,
           enum: ["HOME", "WORK", "OTHER"],
-          default: "HOME"
+          default: "HOME",
         },
         address: {
           type: String,
-          required: true
+          required: true,
         },
         coordinates: {
-          type: [Number], // [longitude, latitude]
-          default: [0, 0]
-        }
-      }
+          type: [Number],
+          default: [0, 0],
+        },
+      },
     ],
 
     // --- 5. Push Notification Token ---
     fcmToken: {
       type: String,
-      default: null // Mobile background notification sound/alerts ke liye
+      default: null,
     },
 
-    // --- 6. Account Status & Moderation ---
+    // --- 6. Account Status ---
     isSuspended: {
       type: Boolean,
-      default: false
+      default: false,
     },
     suspensionReason: {
       type: String,
-      default: null
+      default: null,
     },
     isPhoneVerified: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
-    timestamps: true // createdAt aur updatedAt auto manage honge
+    timestamps: true,
   }
 );
 
-// --- Password Hashing Pre-Save Hook ---
+// Pre-save password hashing
 userSchema.pre("save", async function () {
-  if (!this.isModified("password"))
-    return ;
-
+  if (!this.isModified("password")) return;
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
-
 });
 
-// --- Helper Method: Compare Password ---
 userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

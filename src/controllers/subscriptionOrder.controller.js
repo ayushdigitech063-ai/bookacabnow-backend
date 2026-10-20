@@ -1,60 +1,67 @@
-const SubscriptionPlan = require("../models/SubscriptionPlan.model.js");
-const SubscriptionOrder = require("../models/SubscriptionOrder.model.js");
-const FleetCompany = require("../models/FleetCompany.model.js");
-const Vehicle = require("../models/Vehicle.model.js");
-const { asyncHandler } = require("../utils/asyncHandler.js");
-const { createApiError } = require("../utils/apiError.js");
-const { sendApiResponse } = require("../utils/apiResponse.js");
+// src/controllers/subscriptionOrder.controller.js
+const SubscriptionPlan = require("../models/SubscriptionPlan.model");
+const SubscriptionOrder = require("../models/SubscriptionOrder.model");
+const FleetCompany = require("../models/FleetCompany.model");
+const Vehicle = require("../models/Vehicle.model");
+const { asyncHandler } = require("../utils/asyncHandler");
+const { createApiError } = require("../utils/apiError");
 
-// 1. Order initiate karna (Fleet Owner Only)
+// ==========================================
+// 1. INITIATE SUBSCRIPTION ORDER
+// POST /api/v1/subscription-orders/create
+// ==========================================
 const createSubscriptionOrder = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const { planId, paymentGateway = "MANUAL" } = req.body;
 
-  // Fleet Owner verification
-  const fleetCompany = req.fleetCompany;
+  // 1. Verify fleet company existence
+  const fleetCompany = await FleetCompany.findOne({
+    $or: [{ ownerUserId: userId }, { userId }, { ownerId: userId }],
+  });
+
   if (!fleetCompany) {
-    throw createApiError(403, "Keval registered fleet owners hi subscription le sakte hain");
+    throw createApiError(403, "Only registered fleet owners can purchase a subscription plan.");
   }
 
-  // Plan verification
+  // 2. Verify subscription plan existence and active status
   const plan = await SubscriptionPlan.findById(planId);
   if (!plan || !plan.isActive) {
-    throw createApiError(404, "Subscription plan uplabdh nahi hai ya inactive hai");
+    throw createApiError(404, "Subscription plan is unavailable or currently inactive.");
   }
 
-  // Downgrade Guard: Active gaadiyan plan slots se jyada toh nahi hain?
+  // 3. Downgrade Guard: Ensure existing active cars do not exceed new plan limit
   const activeCarsCount = await Vehicle.countDocuments({
-    fleetCompanyId: fleetCompany._id,
-    isActive: true,
+    ownerType: "FLEET",
+    ownerId: fleetCompany._id,
+    status: "ACTIVE",
   });
 
   if (activeCarsCount > plan.maxCarSlots) {
     throw createApiError(
       400,
-      `Aapke paas ${activeCarsCount} active gaadiyan hain. Is plan ki limit ${plan.maxCarSlots} hai. Pehle extra gaadiyan deactivate karein.`
+      `You currently have ${activeCarsCount} active vehicles. This plan allows a maximum of ${plan.maxCarSlots} vehicles. Please deactivate extra vehicles before purchasing.`
     );
   }
 
-  // Amount & GST Calculation (18% GST)
+  // 4. Calculate pricing & 18% GST
   const basePrice = plan.price;
   const discountAmount = (basePrice * (plan.discountPercentage || 0)) / 100;
   const finalPrice = Math.round(basePrice - discountAmount);
   const gstAmount = Math.round(finalPrice * 0.18);
   const totalPayable = finalPrice + gstAmount;
 
-  // Order ID generation
+  // 5. Generate unique Order ID
   const randomSuffix = Math.floor(10000 + Math.random() * 90000);
   const orderId = `ORD-SUB-${Date.now().toString().slice(-4)}${randomSuffix}`;
 
-  // Order create (Status: PENDING)
+  // 6. Create order in PLACED / PENDING state
   const newOrder = await SubscriptionOrder.create({
     orderId,
     fleetCompanyId: fleetCompany._id,
     orderedByUserId: userId,
     buyerDetails: {
       companyName: fleetCompany.companyName,
-      ownerName: req.user.name || "Fleet Owner",
+      ownerName: req.user.fullName || req.user.name || "Fleet Owner",
       phone: req.user.phone,
       email: req.user.email || "support@fleet.com",
       gstNumber: fleetCompany.gstNumber || "N/A",
@@ -78,20 +85,22 @@ const createSubscriptionOrder = asyncHandler(async (req, res) => {
     paymentGateway,
   });
 
-  return sendApiResponse(
-    res,
-    201,
-    {
+  return res.status(201).json({
+    success: true,
+    message: "Subscription order initiated successfully.",
+    data: {
       orderId: newOrder.orderId,
       totalPayable,
       planSnapshot: newOrder.planSnapshot,
       paymentStatus: newOrder.paymentStatus,
     },
-    "Subscription order initiate ho gaya"
-  );
+  });
 });
 
-// 2. Payment Verification & Activation (With Mock Bypass Support)
+// ==========================================
+// 2. VERIFY PAYMENT & ACTIVATE PLAN
+// POST /api/v1/subscription-orders/verify
+// ==========================================
 const verifySubscriptionPayment = asyncHandler(async (req, res) => {
   const {
     orderId,
@@ -102,64 +111,68 @@ const verifySubscriptionPayment = asyncHandler(async (req, res) => {
   } = req.body;
 
   if (!orderId) {
-    throw createApiError(400, "orderId zaroori hai");
+    throw createApiError(400, "Order ID is required.");
   }
 
-  // Order check
   const order = await SubscriptionOrder.findOne({ orderId });
   if (!order) {
-    throw createApiError(404, "Subscription order nahi mila");
+    throw createApiError(404, "Subscription order not found.");
   }
 
   if (order.paymentStatus === "SUCCESS") {
-    throw createApiError(400, "Yeh order pehle se verified aur active hai");
+    throw createApiError(400, "This subscription order is already verified and active.");
   }
 
   const fleetCompany = await FleetCompany.findById(order.fleetCompanyId);
   if (!fleetCompany) {
-    throw createApiError(404, "Fleet company profile nahi mili");
+    throw createApiError(404, "Fleet company profile not found.");
   }
 
-  // Gateway Verification vs Mock Bypass Logic
+  // Handle mock payment bypass in non-production environments
   let verifiedPaymentId = gatewayPaymentId;
   let verifiedOrderId = gatewayOrderId;
 
   const isDevOrTest = process.env.NODE_ENV !== "production";
 
   if (isMockPayment && isDevOrTest) {
-    // Dummy transaction IDs generate karo
     verifiedPaymentId = verifiedPaymentId || `MOCK_PAY_${Date.now()}`;
     verifiedOrderId = verifiedOrderId || `MOCK_ORD_${Date.now()}`;
   } else {
-    // Production / Real Gateway check
     if (!gatewayPaymentId || !gatewaySignature) {
-      throw createApiError(400, "Payment verification credentials missing");
+      throw createApiError(400, "Payment verification credentials are missing.");
     }
-    // Baad mein Razorpay crypto verification yahan add hogi
+    // Razorpay crypto verification can be added here
   }
 
-  // Date Rollover Calculation
+  // Date rollover calculation: Extend expiry if an active subscription exists
   const now = new Date();
-  const currentExpiry = fleetCompany.subscription?.expiresAt;
+  const activeExistingOrder = await SubscriptionOrder.findOne({
+    fleetCompanyId: fleetCompany._id,
+    orderStatus: "COMPLETED",
+    paymentStatus: "SUCCESS",
+    expiresAt: { $gt: now },
+  }).sort({ expiresAt: -1 });
 
   let startDate = now;
   let newExpiryDate;
 
-  // Agar purana plan bacha hua hai toh usi ke aage date extend hogi
-  if (currentExpiry && new Date(currentExpiry) > now) {
-    startDate = new Date(currentExpiry);
+  if (activeExistingOrder && activeExistingOrder.expiresAt > now) {
+    startDate = new Date(activeExistingOrder.expiresAt);
     newExpiryDate = new Date(
-      new Date(currentExpiry).getTime() +
+      startDate.getTime() +
         order.planSnapshot.durationInDays * 24 * 60 * 60 * 1000
     );
   } else {
     newExpiryDate = new Date(
-      now.getTime() + order.planSnapshot.durationInDays * 24 * 60 * 60 * 1000
+      now.getTime() +
+        order.planSnapshot.durationInDays * 24 * 60 * 60 * 1000
     );
   }
 
-  // Order status update
-  const invoiceNumber = `INV-SUB-${Date.now().toString().slice(-4)}${Math.floor(1000 + Math.random() * 9000)}`;
+  // Generate invoice number
+  const invoiceNumber = `INV-SUB-${Date.now().toString().slice(-4)}${Math.floor(
+    1000 + Math.random() * 9000
+  )}`;
 
   order.orderStatus = "COMPLETED";
   order.paymentStatus = "SUCCESS";
@@ -172,7 +185,7 @@ const verifySubscriptionPayment = asyncHandler(async (req, res) => {
   order.gatewaySignature = gatewaySignature || null;
   await order.save();
 
-  // Fleet Company quota aur validity sync
+  // Sync active subscription details on FleetCompany model
   fleetCompany.subscription = {
     isActive: true,
     currentPlanId: order.planId,
@@ -183,23 +196,54 @@ const verifySubscriptionPayment = asyncHandler(async (req, res) => {
   };
   await fleetCompany.save();
 
-  return sendApiResponse(
-    res,
-    200,
-    {
+  return res.status(200).json({
+    success: true,
+    message: "Payment verified successfully and subscription activated.",
+    data: {
       orderId: order.orderId,
       invoiceNumber: order.invoiceNumber,
       paymentStatus: order.paymentStatus,
-      maxCarSlots: fleetCompany.subscription.maxCarSlots,
+      maxCarSlots: order.planSnapshot.maxCarSlots,
       startsAt: startDate,
       expiresAt: newExpiryDate,
       mode: isMockPayment ? "MOCK_BYPASS_MODE" : "LIVE_GATEWAY",
     },
-    "Payment successfully verify ho gaya aur subscription activate kar di gayi"
-  );
+  });
+});
+
+// ==========================================
+// 3. GET ACTIVE SUBSCRIPTION STATUS
+// GET /api/v1/subscription-orders/active
+// ==========================================
+const getActiveSubscription = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  const fleetCompany = await FleetCompany.findOne({
+    $or: [{ ownerUserId: userId }, { userId }, { ownerId: userId }],
+  });
+
+  if (!fleetCompany) {
+    throw createApiError(404, "Fleet company profile not found.");
+  }
+
+  const activeSubscription = await SubscriptionOrder.findOne({
+    fleetCompanyId: fleetCompany._id,
+    orderStatus: "COMPLETED",
+    paymentStatus: "SUCCESS",
+    expiresAt: { $gte: new Date() },
+  }).sort({ expiresAt: -1 });
+
+  return res.status(200).json({
+    success: true,
+    message: activeSubscription
+      ? "Active subscription details retrieved successfully."
+      : "No active subscription found.",
+    data: activeSubscription || null,
+  });
 });
 
 module.exports = {
   createSubscriptionOrder,
   verifySubscriptionPayment,
+  getActiveSubscription,
 };

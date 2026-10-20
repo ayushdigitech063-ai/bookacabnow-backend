@@ -11,6 +11,7 @@ const driverRouter = require("./routes/driver.routes");
 const bookingRouter = require("./routes/booking.routes");
 const subscriptionPlanRoutes = require("./routes/subscriptionPlan.routes.js");
 const subscriptionOrderRoutes = require("./routes/subscriptionOrder.routes.js");
+const publicMarketplaceRoutes = require("./routes/publicMarketplace.routes");
 
 const app = express();
 
@@ -33,6 +34,8 @@ app.use("/api/v1/driver", driverRouter);
 app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/subscription-plans", subscriptionPlanRoutes);
 app.use("/api/v1/subscription-orders", subscriptionOrderRoutes);
+// Public endpoints (Bina token ke chalenge)
+app.use("/api/v1/public", publicMarketplaceRoutes);
 
 
 app.use(errorHandler);

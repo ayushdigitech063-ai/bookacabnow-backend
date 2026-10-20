@@ -353,6 +353,10 @@ const startRide = asyncHandler(async (req, res) => {
 });
 
 
+// ==========================================
+// COMPLETE RIDE & FARE SETTLEMENT
+// PATCH /api/v1/driver/rides/:bookingId/complete
+// ==========================================
 const completeRide = asyncHandler(async (req, res) => {
   const driverId = req.user._id;
   const { bookingId } = req.params;
@@ -407,15 +411,15 @@ const completeRide = asyncHandler(async (req, res) => {
   const extraParking = Number(parkingCharges) || 0;
   const totalPhysicalLevies = extraTolls + extraParking;
 
-  // 7. Previous Dues jo is ride me jode gaye the
-  const previousDues = booking.pricing?.previousDues || 0;
+  // 7. Previous Dues (Settlement check)
+  const previousDues = Number(booking.pricing?.previousDues) || 0;
 
-  // Final Billable Amount jo Rider ko bharna hai
+  // Final Billable Amount for Rider
   const totalFare = subTotal + calculatedGst + totalPhysicalLevies + previousDues;
 
   const finalPaymentMethod = paymentMethod || booking.payment?.method || "CASH";
 
-  // Update Booking State
+  // 8. Update Booking State
   booking.status = "COMPLETED";
   booking.tripTimestamps = {
     ...booking.tripTimestamps,
@@ -434,46 +438,46 @@ const completeRide = asyncHandler(async (req, res) => {
     totalFare,
   };
 
+  if (!booking.payment) {
+    booking.payment = {};
+  }
   booking.payment.method = finalPaymentMethod;
   booking.payment.status = "COMPLETED";
   await booking.save();
 
-  // 8. Financial Settlement
-  const driverTripEarnings = subTotal + totalPhysicalLevies; // Driver ki is trip ki actual mehnat
+  // 9. Financial Settlement (Clean $inc syntax)
+  const driverTripEarnings = subTotal + totalPhysicalLevies;
+
+  const driverSetFields = {
+    "driverDetails.isAvailable": true,
+  };
+
+  const driverIncFields = {
+    "driverDetails.totalTripsCompleted": 1,
+  };
 
   if (finalPaymentMethod === "CASH") {
-    // Rider ne pura cash driver ko thama diya.
-    // Agar usme purana previousDues jud ke aaya tha, toh driver par platform ka due chadh gaya:
-    const driverUpdate = {
-      $set: { "driverDetails.isAvailable": true },
-      $inc: { "driverDetails.totalTripsCompleted": 1 },
-    };
-
+    // Rider ne cash driver ko diya; agar pichla due tha toh platform dues increment honge
     if (previousDues > 0) {
-      driverUpdate.$inc["driverDetails.cashDuesToPlatform"] = previousDues;
+      driverIncFields["driverDetails.cashDuesToPlatform"] = previousDues;
     }
-
-    await User.findByIdAndUpdate(driverId, driverUpdate);
   } else if (finalPaymentMethod === "ONLINE_UPI") {
-    // Rider ne online pay kiya (company ke paas aaya)
-    // Driver ko uski kamai wallet me credit karo:
-    await User.findByIdAndUpdate(driverId, {
-      $set: { "driverDetails.isAvailable": true },
-      $inc: {
-        "driverDetails.totalTripsCompleted": 1,
-        "driverDetails.walletBalance": driverTripEarnings,
-      },
-    });
+    // Online payment company account me gaya, driver ka wallet balance credit hoga
+    driverIncFields["driverDetails.walletBalance"] = driverTripEarnings;
   }
 
-  // 9. Rider ke outstanding dues ab final clear karo (kyunki usne trip me pay kar diya)
+  await User.findByIdAndUpdate(driverId, {
+    $set: driverSetFields,$inc: driverIncFields,
+  });
+
+  // 10. Rider Outstanding Dues Clear
   if (previousDues > 0 && booking.riderId) {
     await User.findByIdAndUpdate(booking.riderId, {
       $inc: { "riderDetails.outstandingDues": -previousDues },
     });
   }
 
-  // 10. Vehicle Unlock
+  // 11. Vehicle Unlock & Counter Increment
   if (booking.vehicleId) {
     await Vehicle.findByIdAndUpdate(booking.vehicleId, {
       $set: { isAvailable: true },$inc: { totalTripsCompleted: 1 },

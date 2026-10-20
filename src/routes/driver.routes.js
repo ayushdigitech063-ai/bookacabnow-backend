@@ -11,47 +11,46 @@ const {
   updateLocationSchema,
   bookingIdParamSchema,
   startRideSchema,
-  completeRideSchema
+  completeRideSchema,
 } = require("../validations/driver.validation");
 
 // Controllers
 const {
   updateDriverShift,
   updateDriverLocation,
+  getNearbyRideRequests,
+  getDriverEarnings,
   acceptRideRequest,
   markDriverArrived,
   startRide,
   completeRide,
-  getNearbyRideRequests,
-  getDriverEarnings
 } = require("../controllers/driver.controller");
 
-
+// Global Route Guards
 router.use(verifyToken);
 router.use(authorizeRoles("INDIVIDUAL_DRIVER", "FLEET_DRIVER"));
 
+// ==========================================
+// 1. DRIVER STATE & METRICS
+// ==========================================
+router.patch("/shift", validate(updateShiftSchema), updateDriverShift);
+router.patch("/location", validate(updateLocationSchema), updateDriverLocation);
+router.get("/earnings", getDriverEarnings);
 
+// ==========================================
+// 2. STATIC RIDE QUERIES (Place before :bookingId)
+// ==========================================
+router.get("/rides/nearby", getNearbyRideRequests);
 
-router.patch(
-  "/shift",
-  validate(updateShiftSchema),
-  updateDriverShift
-);
-
-router.patch(
-  "/location",
-  validate(updateLocationSchema),
-  updateDriverLocation
-);
-
-// 3. Accept Ride: PATCH /api/v1/driver/rides/:bookingId/accept
+// ==========================================
+// 3. PARAMETERIZED RIDE LIFECYCLE
+// ==========================================
 router.patch(
   "/rides/:bookingId/accept",
   validate(bookingIdParamSchema, "params"),
   acceptRideRequest
 );
 
-// 4. Mark Arrived: PATCH /api/v1/driver/rides/:bookingId/arrived
 router.patch(
   "/rides/:bookingId/arrived",
   validate(bookingIdParamSchema, "params"),
@@ -60,8 +59,8 @@ router.patch(
 
 router.patch(
   "/rides/:bookingId/start",
-  validate(bookingIdParamSchema, "params"), // Validate bookingId in URL
-  validate(startRideSchema, "body"),        // Validate OTP in JSON body
+  validate(bookingIdParamSchema, "params"),
+  validate(startRideSchema, "body"),
   startRide
 );
 
@@ -71,7 +70,5 @@ router.patch(
   validate(completeRideSchema, "body"),
   completeRide
 );
-router.get("/earnings", getDriverEarnings);
-router.get("/rides/nearby", getNearbyRideRequests);
 
 module.exports = router;
