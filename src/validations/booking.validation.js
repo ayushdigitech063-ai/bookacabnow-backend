@@ -107,7 +107,7 @@ const createBookingSchema = Joi.object({
       }),
   }).required(),
 
-  pickupDateTime: Joi.date().iso().required().messages({
+  pickupDateTime: Joi.date().iso().optional().messages({
     "date.base": "pickupDateTime must be a valid ISO Date",
     "any.required": "pickupDateTime is required",
   }),

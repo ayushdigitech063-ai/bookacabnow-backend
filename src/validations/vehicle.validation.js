@@ -74,31 +74,63 @@ const createVehicleSchema = Joi.object({
     "any.required": "Expected per-km rate is required"
   }),
 
-  enabledServices: Joi.array()
-    .items(
-      Joi.string().valid(
-        "LOCAL_RIDE",
-        "OUTSTATION",
-        "AIRPORT_TRANSFER",
-        "HOURLY_RENTAL",
-        "WEDDING",
-        "CORPORATE"
-      )
+enabledServices: Joi.alternatives()
+    .try(
+      // Case 1: Agar raw JSON array aaye
+      Joi.array().items(
+        Joi.string().valid(
+          "LOCAL_RIDE",
+          "OUTSTATION",
+          "AIRPORT_TRANSFER",
+          "HOURLY_RENTAL",
+          "WEDDING",
+          "CORPORATE"
+        )
+      ),
+      // Case 2: Agar Postman/FormData se stringified JSON aaye ("['LOCAL_RIDE', ...]")
+      Joi.string().custom((value, helpers) => {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          // Fallback: Agar comma-separated ho ("LOCAL_RIDE, OUTSTATION")
+          const list = value.split(",").map((s) => s.trim());
+          if (list.length > 0) return list;
+        }
+        return helpers.error("any.invalid");
+      })
     )
-    .min(1)
     .default(["LOCAL_RIDE"]),
 
-  features: Joi.object({
-    hasAC: Joi.boolean().default(true),
-    isPetFriendly: Joi.boolean().default(false),
-    hasExtraLuggageCarrier: Joi.boolean().default(false),
-    isNonSmoking: Joi.boolean().default(true)
-  }).default({
-    hasAC: true,
-    isPetFriendly: false,
-    hasExtraLuggageCarrier: false,
-    isNonSmoking: true
-  }),
+  // --- REPLACE features WITH THIS ---
+  features: Joi.alternatives()
+    .try(
+      // Case 1: Agar raw JSON object aaye
+      Joi.object({
+        hasAC: Joi.boolean().default(true),
+        isPetFriendly: Joi.boolean().default(false),
+        hasExtraLuggageCarrier: Joi.boolean().default(false),
+        isNonSmoking: Joi.boolean().default(true),
+      }),
+      // Case 2: Agar Postman/FormData se stringified object aaye ("{'hasAC': true}")
+      Joi.string().custom((value, helpers) => {
+        try {
+          const parsed = JSON.parse(value);
+          if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+            return parsed;
+          }
+        } catch (e) {
+          return helpers.error("any.invalid");
+        }
+        return helpers.error("any.invalid");
+      })
+    )
+    .default({
+      hasAC: true,
+      isPetFriendly: false,
+      hasExtraLuggageCarrier: false,
+      isNonSmoking: true,
+    }),
 
   languages: Joi.array().items(Joi.string().trim()).default(["HINDI", "ENGLISH"]),
 

@@ -159,7 +159,7 @@ const fleetCompanySchema = new mongoose.Schema(
 );
 
 // High-speed lookup indexes
-fleetCompanySchema.index({ slug: 1 });
+// fleetCompanySchema.index({ slug: 1 });
 fleetCompanySchema.index({ operatingCities: 1 });
 
 const FleetCompany = mongoose.model("FleetCompany", fleetCompanySchema);

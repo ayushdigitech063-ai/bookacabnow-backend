@@ -23,7 +23,7 @@ const { validate } = require("../middlewares/validate.middleware");
 
 // Multer upload fields config for vehicle registration
 const vehicleUploadFields = upload.fields([
-  { name: "vehicleImages", maxCount: 5 },
+  { name: "images", maxCount: 5 },
   { name: "rcFile", maxCount: 1 },
   { name: "insuranceFile", maxCount: 1 },
 ]);
@@ -60,8 +60,8 @@ router.patch(
   upload.fields([
     { name: "rcFile", maxCount: 1 },
     { name: "insuranceFile", maxCount: 1 },
-  ]),
-  validate(updateVehicleDocumentsSchema),
+    ]),
+    validate(updateVehicleDocumentsSchema),
   updateVehicleDocuments
 );
 

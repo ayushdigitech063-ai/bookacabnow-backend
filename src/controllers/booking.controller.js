@@ -4,6 +4,7 @@ const { createApiError } = require("../utils/apiError");
 const { sendApiResponse } = require("../utils/apiResponse");
 const Vehicle = require("../models/Vehicle.model");
 const Booking = require("../models/Booking.model");
+const User = require("../models/User.model");
 const crypto = require("crypto");
 const { calculateHaversineDistanceKm } = require("../utils/geoUtils");
 const { RIDER_FEEDBACK_TAGS, DRIVER_FEEDBACK_TAGS } = require("../constants/ratingReasons");
@@ -155,6 +156,8 @@ const createBookingRequest = asyncHandler(async (req, res) => {
     category,
     paymentMethod = "CASH",
   } = req.body;
+ 
+const scheduledPickupTime = pickupDateTime ? new Date(pickupDateTime) : new Date();
 
   // 1. Prevent overlapping active rides
   const existingActiveRide = await Booking.findOne({
@@ -211,7 +214,7 @@ const createBookingRequest = asyncHandler(async (req, res) => {
       address: dropoff.address,
       coordinates: dropoff.coordinates,
     },
-    pickupDateTime,
+    pickupDateTime: scheduledPickupTime,
     pricing: {
       baseFare: rates.baseFare,
       perKmRate: rates.perKmRate,
@@ -652,6 +655,7 @@ const getBookingDetails = asyncHandler(async (req, res) => {
 
   // 1. Fetch booking with populated references matching your exact models
   const booking = await Booking.findById(bookingId)
+  .select("+startOtp")
     .populate("riderId", "fullName phone email")
     .populate({
       path: "driverId",
@@ -743,6 +747,7 @@ const getActiveBooking = asyncHandler(async (req, res) => {
 
   // 2. Fetch the latest active ride
   const activeBooking = await Booking.findOne(filter)
+     .select("+startOtp")
     .populate("riderId", "fullName phone")
     .populate("driverId", "fullName phone driverDetails.rating")
     .populate({

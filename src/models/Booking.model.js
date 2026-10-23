@@ -10,7 +10,7 @@ const bookingSchema = new mongoose.Schema(
       index: true
     },
 
-    // --- Core Relationships ---
+  
     riderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -46,7 +46,7 @@ const bookingSchema = new mongoose.Schema(
       required: true
     },
 
-    // --- Geolocation & Routing ---
+    
     pickup: {
       address: { type: String, required: true },
       coordinates: {
@@ -63,14 +63,15 @@ const bookingSchema = new mongoose.Schema(
     },
     pickupDateTime: {
       type: Date,
-      required: true
+      required: true,
+      default: Date.now,
     },
     returnDateTime: {
       type: Date,
       default: null // Multi-day ya round-trip me required
     },
 
-    // --- 🚀 DAY-WISE MANAGEMENT ENGINE ---
+   
     multiDayDetails: {
       isMultiDay: {
         type: Boolean,
@@ -90,16 +91,16 @@ const bookingSchema = new mongoose.Schema(
       },
       driverAllowancePerDay: {
         type: Number,
-        default: 300 // e.g., ₹300 per day driver food/stay bata
+        default: 300 
       },
       nightStayChargePerNight: {
         type: Number,
         default: 250 // If driving continues after 10 PM
       },
-      // Har din ka itinerary track karne ke liye
+     
       dayWiseSchedule: [
         {
-          dayNumber: { type: Number, required: true }, // Day 1, Day 2, etc.
+          dayNumber: { type: Number, required: true },
           date: { type: Date, required: true },
           startCity: { type: String, default: "" },
           destinationCity: { type: String, default: "" },
@@ -111,7 +112,7 @@ const bookingSchema = new mongoose.Schema(
       ]
     },
 
-    // --- Hourly Rental Addon (Agar tripType === HOURLY_RENTAL ho) ---
+  
     rentalPackage: {
       packageType: {
         type: String,
@@ -122,27 +123,27 @@ const bookingSchema = new mongoose.Schema(
       extraKmRate: { type: Number, default: 0 }
     },
 
-    // --- Airport Transfer Specifics ---
+    
     airportDetails: {
       flightNumber: { type: String, default: null },
       terminal: { type: String, default: null }
     },
 
-    // --- Dynamic Fare Breakdown (0% Platform Fee Model) ---
+  
     pricing: {
       baseFare: { type: Number, required: true },
       perKmRate: { type: Number, required: true },
       estimatedDistanceKm: { type: Number, default: 0 },
       distanceCharge: { type: Number, default: 0 },
-      previousDues: { type: Number, default: 0 }, // <--- Add this field
-      totalDriverAllowance: { type: Number, default: 0 }, // totalDays * driverAllowancePerDay[cite: 1]
+      previousDues: { type: Number, default: 0 },
+      totalDriverAllowance: { type: Number, default: 0 },
       nightStayAllowance: { type: Number, default: 0 },
       tollAndTaxes: { type: Number, default: 0 },
-      platformFee: { type: Number, default: 0 }, // 0 under zero-commission architecture
+      platformFee: { type: Number, default: 0 }, 
       totalFare: { type: Number, required: true }
     },
 
-    // --- Trip Security OTPs ---
+
     startOtp: {
       type: String,
 default: () => Math.floor(1000 + Math.random() * 9000).toString(),
@@ -154,7 +155,7 @@ default: () => Math.floor(1000 + Math.random() * 9000).toString(),
       select: false
     },
 
-    // --- Lifecycle State Machine ---
+  
     status: {
       type: String,
       enum: [
@@ -196,13 +197,13 @@ default: () => Math.floor(1000 + Math.random() * 9000).toString(),
  ratings: {
   riderFeedback: {
     score: { type: Number, min: 1, max: 5 },
-    reasonTag: { type: String, default: null }, // Pre-defined tag (e.g. "RASH_DRIVING")
-    customReason: { type: String, default: null }, // Agar "OTHER" choose kiya ho
+    reasonTag: { type: String, default: null }, 
+    customReason: { type: String, default: null },
     ratedAt: { type: Date, default: null },
   },
   driverFeedback: {
     score: { type: Number, min: 1, max: 5 },
-    reasonTag: { type: String, default: null }, // Pre-defined tag (e.g. "DELAY_AT_PICKUP")
+    reasonTag: { type: String, default: null }, 
     customReason: { type: String, default: null },
     ratedAt: { type: Date, default: null },
   },

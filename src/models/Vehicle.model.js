@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const vehicleSchema = new mongoose.Schema(
   {
-    // --- 1. Dynamic Ownership (refPath) ---
+    
     ownerType: {
       type: String,
       enum: ["INDIVIDUAL", "FLEET"],
@@ -27,23 +27,32 @@ const vehicleSchema = new mongoose.Schema(
     assignedDriverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null, // Currently operating driver
+      default: null,
     },
     isAssigned: {
       type: Boolean,
-      default: false, // True if car is currently occupied/locked by a driver
+      default: false,
     },
 
-    // --- 3. Vehicle Specifications (Form 1:1 Mapping) ---
+   
     brand: {
       type: String,
-      required: [true, "Vehicle brand is required"], // e.g., Maruti Suzuki, Toyota, Hyundai
+      required: [true, "Vehicle brand is required"],
       trim: true,
     },
     model: {
       type: String,
-      required: [true, "Car model name is required"], // e.g., Dzire, Ertiga, Innova Crysta
+      required: [true, "Car model name is required"],
       trim: true,
+    },
+   
+    slug: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      unique: true,
+      sparse: true,
+      index: true,
     },
     category: {
       type: String,
@@ -52,31 +61,66 @@ const vehicleSchema = new mongoose.Schema(
     },
     baseCity: {
       type: String,
-      required: [true, "Base operating city is required"], // e.g., Jaipur, Delhi, Mumbai
+      required: [true, "Base operating city is required"],
       trim: true,
       index: true,
     },
     seatingCapacity: {
       type: Number,
-      required: [true, "Seating capacity is required"], // e.g., 4, 6, 7
+      required: [true, "Seating capacity is required"],
     },
     fuelType: {
       type: String,
       enum: ["PETROL", "DIESEL", "CNG", "PETROL_CNG", "EV"],
       required: true,
     },
-
-    // Transmission filter & badge (Manual / Automatic)
     transmission: {
       type: String,
       enum: ["MANUAL", "AUTOMATIC"],
       default: "MANUAL",
     },
 
-    // Showcase photos for marketplace cards
+    
     images: {
       type: [String],
       default: [],
+    },
+
+    aboutVehicle: {
+      type: String,
+      default:
+        "Clean, AC sedan driven by professional polite driver. Ideal for outstation trips, city tours, and airport transfers.",
+    },
+
+    
+    specs: {
+      luggageCapacity: {
+        type: String,
+        default: "2 Large + 2 Medium Bags",
+      },
+      climateControl: {
+        type: String,
+        default: "Front & Rear AC Vents",
+      },
+      safetyRating: {
+        type: String,
+        default: "ABS + Dual Airbags • 5★ Rated",
+      },
+      mileage: {
+        type: String,
+        default: "24.1 km/l",
+      },
+    },
+
+   
+    amenities: {
+      type: [String],
+      default: [
+        "Music System & Bluetooth",
+        "Mobile Charger & GPS",
+        "Commercial Tourist Permit",
+        "Clean Tissue & Water Bottle",
+      ],
     },
 
     commercialRcNumber: {
@@ -92,7 +136,7 @@ const vehicleSchema = new mongoose.Schema(
       default: "INACTIVE",
     },
 
-    // --- 4. Legal Compliance & Verification Documents ---
+   
     complianceDocuments: {
       rcUrl: { type: String, default: null },
       insuranceExpiry: { type: Date, default: null },
@@ -118,19 +162,18 @@ const vehicleSchema = new mongoose.Schema(
       },
     },
 
-    // --- 5. Pricing Structure (Per-Km & Per-Day) ---
     expectedPerKmRate: {
       type: Number,
-      required: [true, "Expected per-km rate is required"], // e.g., 12, 14, 16
+      required: [true, "Expected per-km rate is required"],
       min: [5, "Per-km rate must be valid"],
     },
     dailyRate: {
       type: Number,
-      default: 0, // e.g., 2100, 3200 for daily package
+      default: 0,
       min: [0, "Daily rate cannot be negative"],
     },
 
-    // --- 6. Multi-Vertical Offerings ---
+
     enabledServices: {
       type: [String],
       enum: [
@@ -144,7 +187,7 @@ const vehicleSchema = new mongoose.Schema(
       default: ["LOCAL_RIDE"],
     },
 
-    // --- 7. Search Filter Amenities ---
+
     features: {
       hasAC: { type: Boolean, default: true },
       isPetFriendly: { type: Boolean, default: false },
@@ -155,20 +198,15 @@ const vehicleSchema = new mongoose.Schema(
       type: [String],
       default: ["HINDI", "ENGLISH"],
     },
-
-    // Rating display on card (e.g., ★ 4.8)
     rating: {
       average: { type: Number, default: 4.8 },
       totalReviews: { type: Number, default: 0 },
     },
-
-    // Card tag label (e.g., "Verified Cab", "Most Booked")
     badgeText: {
       type: String,
       default: "Verified Cab",
     },
 
-    // --- 8. Availability & Telemetry ---
     isAvailable: {
       type: Boolean,
       default: true,
@@ -185,7 +223,7 @@ const vehicleSchema = new mongoose.Schema(
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        default: [75.7873, 26.9124], // Jaipur default coordinates
+        default: [75.7873, 26.9124],
       },
     },
   },
@@ -194,7 +232,15 @@ const vehicleSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for filters and performance
+
+vehicleSchema.pre("save", function () {
+  if (!this.slug && this.brand && this.model) {
+    const raw = `${this.brand}-${this.model}-${Math.floor(1000 + Math.random() * 9000)}`;
+    this.slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  }
+});
+
+
 vehicleSchema.index({ currentLocation: "2dsphere" });
 vehicleSchema.index({ baseCity: 1, category: 1, isAvailable: 1 });
 vehicleSchema.index({ expectedPerKmRate: 1, dailyRate: 1 });
